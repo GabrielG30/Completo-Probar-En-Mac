@@ -1,0 +1,125 @@
+/* Reset básico */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #EBF5FB; /* Fondo muy claro */
+  overflow: hidden; /* Evita el scroll global */
+  color: #2C3E50; /* Texto en azul oscuro */
+}
+
+/* Contenedor general */
+.app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden; /* Evita el scroll global */
+  background-color: #EBF5FB; /* Fondo muy claro */
+}
+
+/* Sidebar */
+.sidebar {
+  width: 250px;
+  background-color: #2C3E50; /* Azul oscuro */
+  color: white; /* Texto blanco */
+  padding: 20px;
+  position: fixed; /* Sidebar fijo */
+  top: 0;
+  left: 0;
+  bottom: 0;
+  overflow-y: auto; /* Permite el scroll dentro del sidebar si es necesario */
+}
+
+.sidebar h2 {
+  text-align: center;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  cursor: pointer;
+}
+
+.sidebar li:hover {
+  background-color: #34495e; /* Cambia el color en hover */
+}
+
+/* Contenido principal */
+.content {
+  flex: 1;
+  margin-left: 250px; /* Espacio para que no se sobreponga al sidebar */
+  padding: 20px;
+  height: 100vh;
+  overflow-y: auto; /* Solo permite scroll dentro del contenido */
+  box-sizing: border-box;
+  background-color: #EBF5FB; /* Fondo muy claro */
+}
+
+/* Evitar que el texto de tablas o botones cambie en modo claro/oscuro */
+.inventario-table th,
+.inventario-table td {
+  color: #2C3E50; /* Texto en azul oscuro */
+}
+
+/* Asegura que los botones sean siempre visibles */
+button {
+  background-color: #3498DB; /* Azul medio */
+  color: white; /* Texto blanco */
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 5px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  font-weight: bold; /* Texto en negrita para mejor visibilidad */
+}
+
+button:hover {
+  background-color: #2C3E50; /* Azul oscuro en hover */
+}
+
+/* Estilos adicionales para asegurar que el texto en los modales no cambie de color */
+.modal-content, .modal-editar .modal-content {
+  background-color: white;
+  color: #2C3E50; /* Texto en azul oscuro */
+}
+
+.modal-content button,
+.editar-producto-popup button {
+  background-color: #3498DB; /* Azul medio */
+  color: white;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 5px;
+  font-weight: bold;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.modal-content button:hover,
+.editar-producto-popup button:hover {
+  background-color: #2C3E50; /* Azul oscuro en hover */
+}
+
+/* Mejorar contraste para modales y botones */
+.close {
+  color: #2C3E50; /* Azul oscuro */
+  font-size: 28px;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.close:hover,
+.close:focus {
+  color: #E74C3C; /* Rojo en hover */
+  text-decoration: none;
+  cursor: pointer;
+}

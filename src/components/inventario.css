@@ -1,0 +1,452 @@
+/* Contenedor principal del inventario */
+.inventario-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  margin-left: 250px;
+  max-height: 100vh;
+  overflow-y: auto;
+  background-color: #EBF5FB; /* Fondo muy claro */
+}
+
+/* Encabezado con íconos y barra de búsqueda */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 20px;
+}
+
+/* Contenedor de íconos */
+.icon-container {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Espacio entre los íconos */
+}
+
+/* Estilos para los íconos */
+.config-icon, .add-product-icon {
+  cursor: pointer;
+  color: #3498DB; /* Azul medio */
+  transition: color 0.3s ease;
+}
+
+.config-icon:hover, .add-product-icon:hover {
+  color: #2C3E50; /* Azul oscuro al pasar el mouse */
+}
+
+/* Barra de búsqueda */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Espacio entre el input y el botón */
+  width: 100%; /* Ajusta el ancho según sea necesario */
+  max-width: 1000px; /* Puedes cambiar este valor para ajustar el tamaño */
+}
+
+.search-bar input {
+  padding: 10px;
+  border: 1px solid #AED6F1; /* Azul pastel */
+  border-radius: 10px;
+  background-color: #FFFFFF; /* Fondo blanco */
+  transition: border-color 0.3s ease;
+}
+
+.search-bar input:focus {
+  border-color: #3498DB; /* Borde azul cuando está seleccionado */
+  outline: none;
+}
+
+.search-bar button {
+  padding: 12px 19px;
+  background-color: #3498DB; /* Azul medio */
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.search-bar button:hover {
+  background-color: #2C3E50; /* Azul oscuro al pasar el mouse */
+}
+
+/* Estilo para el input de carga de archivos */
+.file-upload {
+  margin-bottom: 20px;
+  padding: 10px;
+  border: 1px solid #AED6F1; /* Azul pastel */
+  border-radius: 5px;
+  background-color: #FFFFFF; /* Fondo blanco */
+  cursor: pointer;
+}
+
+.file-upload:hover {
+  background-color: #EBF5FB; /* Fondo muy claro al pasar el mouse */
+}
+
+/* Tabla de inventario */
+.inventario-table {
+  width: 100%;
+  max-width: 900px;
+  border-collapse: collapse;
+  margin-top: 20px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.inventario-table th, .inventario-table td {
+  border: 1px solid #AED6F1; /* Azul pastel */
+  padding: 10px;
+  text-align: center;
+}
+
+.inventario-table th {
+  background-color: #3498DB; /* Azul medio */
+  color: white;
+}
+
+/* Botones de acción */
+.stock-buttons {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.stock-buttons button {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Botones de aumentar stock */
+.stock-buttons .increase {
+  background-color: #28a745; /* Verde */
+  color: white;
+}
+
+.stock-buttons .increase:hover {
+  background-color: #218838; /* Verde más oscuro */
+}
+
+/* Botones de disminuir stock */
+.stock-buttons .decrease {
+  background-color: #dc3545; /* Rojo */
+  color: white;
+}
+
+.stock-buttons .decrease:hover {
+  background-color: #c82333; /* Rojo más oscuro */
+}
+
+/* Mejora de botones para modo claro y oscuro */
+button {
+  background-color: #3498DB; /* Azul medio */
+  color: white;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 5px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  font-weight: bold; /* Aseguramos que el texto sea más legible */
+}
+
+button:hover {
+  background-color: #2C3E50; /* Azul oscuro al pasar el mouse */
+}
+
+/* Ajuste para el modo claro */
+@media (prefers-color-scheme: light) {
+  button {
+    background-color: #3498DB; /* Azul medio en modo claro */
+    color: white;
+  }
+  button:hover {
+    background-color: #2C3E50; /* Azul oscuro al pasar el mouse */
+  }
+
+  /* Cambiar color de fondo y texto para modales en modo claro */
+  .modal-content, .modal-editar .modal-content {
+    background-color: white;
+    color: black;
+  }
+
+  /* Fondo de botones en inventario */
+  .file-upload {
+    background-color: #FFFFFF; /* Fondo blanco */
+    border: 1px solid #AED6F1; /* Azul pastel */
+  }
+
+  .file-upload:hover {
+    background-color: #EBF5FB; /* Fondo muy claro al pasar el mouse */
+  }
+
+  /* Botones dentro de los pop-ups emergentes */
+  .modal-content button,
+  .editar-producto-popup button {
+    background-color: #3498DB; /* Azul medio */
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 5px;
+    font-weight: bold; /* Asegura que el texto sea legible */
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Botones de pop-up - Hover */
+  .modal-content button:hover,
+  .editar-producto-popup button:hover {
+    background-color: #2C3E50; /* Azul oscuro al pasar el mouse */
+  }
+}
+
+/* Ajuste para el modo oscuro */
+@media (prefers-color-scheme: dark) {
+  button {
+    background-color: #2C3E50; /* Azul oscuro en modo oscuro */
+    color: white;
+  }
+  button:hover {
+    background-color: #3498DB; /* Azul medio al pasar el mouse */
+  }
+
+  .modal-content, .modal-editar .modal-content {
+    background-color: #333;
+    color: white;
+  }
+
+  /* Estilos para inputs en modo oscuro */
+  .editar-producto-popup input {
+    background-color: #555;
+    color: white;
+    border: 1px solid #888;
+  }
+
+  /* Fondo de botones en modo oscuro */
+  .file-upload {
+    background-color: #444;
+    border: 1px solid #666;
+  }
+
+  .file-upload:hover {
+    background-color: #555;
+  }
+
+  /* Botones dentro de los pop-ups emergentes */
+  .modal-content button,
+  .editar-producto-popup button {
+    background-color: #2C3E50; /* Azul oscuro en modo oscuro */
+    color: white;
+  }
+
+  /* Botones de pop-up - Hover */
+  .modal-content button:hover,
+  .editar-producto-popup button:hover {
+    background-color: #3498DB; /* Azul medio al pasar el mouse */
+  }
+}
+
+/* Fondo oscuro para los modales */
+.modal, .modal-editar, .editar-producto-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* Contenido del modal */
+.modal-content, .modal-editar .modal-content {
+  background-color: #fff;
+  color: #333;
+  padding: 20px;
+  border-radius: 8px;
+  width: 360px;
+  word-wrap: break-word; /* Ajuste de texto dentro del modal */
+  max-height: 90vh; /* Limita la altura máxima del modal */
+  overflow-y: auto; /* Añadido para hacer scroll en caso de que el contenido sea largo */
+}
+
+@media (prefers-color-scheme: dark) {
+  .modal-content, .modal-editar .modal-content {
+    background-color: #333;
+    color: white;
+  }
+}
+
+/* Estilos para el popup de editar producto */
+.editar-producto-popup {
+  background-color: #444;
+  padding: 20px;
+  border-radius: 8px;
+  color: white;
+}
+
+.editar-producto-popup input {
+  background-color: #555;
+  color: white;
+  border: 1px solid #888;
+  padding: 8px;
+  width: 100%;
+}
+
+/* Mejor contraste para el botón de cerrar */
+.close {
+  color: #333;
+  font-size: 28px;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.close:hover,
+.close:focus {
+  color: #e74c3c;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .close {
+    color: #aaa;
+  }
+  .close:hover,
+  .close:focus {
+    color: white;
+  }
+}
+
+/* Botón "Guardar inventario" oculto por defecto */
+#guardar-inventario {
+  display: none; /* El botón está oculto al inicio */
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 5px;
+  font-weight: bold;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Mostrar el botón "Guardar inventario" después de seleccionar un archivo */
+#file-upload:valid + #guardar-inventario {
+  display: block; /* El botón se mostrará cuando se seleccione un archivo */
+}
+
+/* Botón de Buscar */
+button.buscar {
+  background-color: #3498DB; /* Azul medio */
+  color: white;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 5px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  font-weight: bold; /* Aseguramos que el texto sea más legible */
+}
+
+button.buscar:hover {
+  background-color: #2C3E50; /* Azul oscuro al pasar el mouse */
+}
+
+/* Ajuste para el modo claro */
+@media (prefers-color-scheme: light) {
+  button.buscar {
+    background-color: #3498DB; /* Azul medio en modo claro */
+    color: white;
+  }
+  button.buscar:hover {
+    background-color: #2C3E50; /* Azul oscuro al pasar el mouse */
+  }
+}
+
+/* Ajuste para el modo oscuro */
+@media (prefers-color-scheme: dark) {
+  button.buscar {
+    background-color: #2C3E50; /* Azul oscuro en modo oscuro */
+    color: white;
+  }
+  button.buscar:hover {
+    background-color: #3498DB; /* Azul medio al pasar el mouse */
+  }
+}
+
+/* Aquí se integran los estilos del botón de búsqueda que pediste */
+.search-bar button {
+  padding: 10px 20px;
+  background-color: #3498DB; /* Azul medio */
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
+
+/* Cambio de color al pasar el mouse */
+.search-bar button:hover {
+  background-color: #2C3E50; /* Azul oscuro al pasar el mouse */
+}
+
+/* Si quieres darle un borde al input al tener foco */
+.search-bar input:focus {
+  border-color: #3498DB; /* Borde azul cuando está seleccionado */
+  outline: none; /* Elimina el contorno azul */
+}
+
+/* Ajuste para el modo claro */
+@media (prefers-color-scheme: light) {
+  .search-bar button {
+    background-color: #3498DB !important; /* Azul medio en modo claro */
+    color: white !important;
+  }
+
+  .search-bar button:hover {
+    background-color: #2C3E50 !important; /* Azul oscuro al pasar el mouse */
+  }
+
+  .search-bar input {
+    background-color: #FFFFFF; /* Fondo blanco */
+    border: 1px solid #AED6F1; /* Azul pastel */
+  }
+}
+@media (prefers-color-scheme: light) {
+  .search-bar input {
+    color: black !important;
+  }
+}
+.iconos-container {
+  display: flex;
+  justify-content: space-between; /* Alinea los iconos a los extremos */
+  align-items: center; /* Alinea verticalmente los iconos */
+  margin-bottom: 20px; /* Espaciado debajo */
+}
+
+.config-icon, .add-product-icon {
+  cursor: pointer;
+  margin: 0 10px; /* Espacio entre los iconos */
+}
+
+.config-icon:hover, .add-product-icon:hover {
+  color: #2C3E50; /* Azul oscuro al pasar el mouse */
+}
