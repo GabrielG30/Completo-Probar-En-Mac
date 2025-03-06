@@ -67,7 +67,17 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadURL('http://localhost:5173');
+  console.log(__dirname);
+  console.log(`file://${path.join(__dirname, 'dist/index.html')}`);
+
+  // Cargar la aplicación en desarrollo o producción
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:5173'); // Desarrollo
+  } else {
+    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html')); // Producción
+  }
+
+  // mainWindow.webContents.openDevTools(); // Descomenta para abrir las herramientas de desarrollo
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show();

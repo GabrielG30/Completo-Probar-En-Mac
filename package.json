@@ -11,13 +11,14 @@
     "preview": "vite preview",
     "start": "concurrently \"npm run dev\" \"npm run electron\"",
     "electron": "electron .",
-    "dist": "electron-builder --mac --win --x64" 
+    "dist": "electron-builder --win --x64 --mac "
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^6.4.5",
     "escpos": "^3.0.0-alpha.6",
+    "mi-punto-venta": "file:",
     "node-printer": "^1.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -36,6 +37,7 @@
     "concurrently": "^8.2.2",
     "electron": "^34.2.0",
     "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^9.19.0",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.0.0",
@@ -52,17 +54,24 @@
     },
     "mac": {
       "icon": "public/1.icns",
-      "target": "dmg" 
+      "target": "dmg"
     },
     "files": [
       "dist/**/*",
       "main.mjs",
-      "preload.js"
+      "preload.js",
+       "node_modules/sqlite3/**/*"
     ],
     "win": {
-       "icon": "public/1.ico",
-      "target": "nsis", 
-      "arch": "x64"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/1.ico"
     }
   }
 }

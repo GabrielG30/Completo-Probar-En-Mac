@@ -1,19 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Función genérica para invocar métodos de IPC con manejo de errores
+const invokeIPC = async (channel, ...args) => {
+  try {
+    console.log(`Invoking IPC channel: ${channel}`, args); // Depuración: Verifica la llamada
+    const result = await ipcRenderer.invoke(channel, ...args);
+    console.log(`Result from IPC channel ${channel}:`, result); // Depuración: Verifica el resultado
+    return result;
+  } catch (err) {
+    console.error(`Error in IPC channel ${channel}:`, err); // Manejo de errores
+    throw err; // Propaga el error para que el renderizado lo maneje
+  }
+};
+
 // Exponemos funciones necesarias a la ventana renderizada
 contextBridge.exposeInMainWorld('electron', {
   // Función para leer el inventario desde la base de datos
-  readInventario: () => {
-    return ipcRenderer.invoke('read-inventario')
-      .then((data) => {
-        console.log('Inventario leído:', data); // Depuración: Verifica los datos recibidos
-        return data;
-      })
-      .catch((err) => {
-        console.error('Error al leer el inventario:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
-  },
+  readInventario: () => invokeIPC('read-inventario'),
 
   // Función para insertar productos en el inventario
   insertInventario: (productos) => {
@@ -21,30 +24,11 @@ contextBridge.exposeInMainWorld('electron', {
       console.error('Error: productos no es un array');
       throw new Error('El parámetro "productos" debe ser un array');
     }
-
-    return ipcRenderer.invoke('insert-inventario', productos)
-      .then((result) => {
-        console.log('Productos insertados:', result); // Depuración: Verifica el resultado
-        return result;
-      })
-      .catch((err) => {
-        console.error('Error al insertar productos:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
+    return invokeIPC('insert-inventario', productos);
   },
 
   // Función para eliminar todos los productos del inventario
-  deleteInventario: () => {
-    return ipcRenderer.invoke('delete-inventario')
-      .then((result) => {
-        console.log('Inventario eliminado:', result); // Depuración: Verifica el resultado
-        return result;
-      })
-      .catch((err) => {
-        console.error('Error al eliminar inventario:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
-  },
+  deleteInventario: () => invokeIPC('delete-inventario'),
 
   // Función para editar un producto del inventario
   updateInventario: (producto) => {
@@ -52,67 +36,30 @@ contextBridge.exposeInMainWorld('electron', {
       console.error('Error: producto no válido');
       throw new Error('El producto debe tener un código válido');
     }
-
-    return ipcRenderer.invoke('update-inventario', producto)
-      .then((result) => {
-        console.log('Producto editado:', result); // Depuración: Verifica el resultado
-        return result;
-      })
-      .catch((err) => {
-        console.error('Error al editar producto:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
+    return invokeIPC('update-inventario', producto);
   },
 
   // Función para realizar una venta
   realizarVenta: (venta, printerName) => {
-    return ipcRenderer.invoke('realizar-venta', venta, printerName)
-      .then((result) => {
-        console.log('Venta realizada:', result); // Depuración: Verifica el resultado
-        return result;
-      })
-      .catch((err) => {
-        console.error('Error al realizar la venta:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
+    if (!venta || !printerName) {
+      console.error('Error: venta o printerName no válidos');
+      throw new Error('La venta y el nombre de la impresora son requeridos');
+    }
+    return invokeIPC('realizar-venta', venta, printerName);
   },
 
   // Función para obtener la configuración (si es necesaria)
-  getConfig: () => {
-    return ipcRenderer.invoke('get-config')
-      .then((config) => {
-        console.log('Configuración obtenida:', config); // Depuración: Verifica la configuración
-        return config;
-      })
-      .catch((err) => {
-        console.error('Error al obtener la configuración:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
-  },
+  getConfig: () => invokeIPC('get-config'),
 
-  // Nueva función para actualizar el stock
+  // Función para actualizar el stock
   updateStock: (codigo, cantidad) => {
-    return ipcRenderer.invoke('updateStock', codigo, cantidad)
-      .then((result) => {
-        console.log('Stock actualizado:', result); // Depuración: Verifica el resultado
-        return result;
-      })
-      .catch((err) => {
-        console.error('Error al actualizar el stock:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
+    if (!codigo || !cantidad) {
+      console.error('Error: codigo o cantidad no válidos');
+      throw new Error('El código y la cantidad son requeridos');
+    }
+    return invokeIPC('updateStock', codigo, cantidad);
   },
 
   // Obtener la lista de impresoras
-  getPrinters: () => {
-    return ipcRenderer.invoke('get-printers')
-      .then((printers) => {
-        console.log('Impresoras obtenidas:', printers); // Depuración: Verifica la lista de impresoras
-        return printers;
-      })
-      .catch((err) => {
-        console.error('Error al obtener las impresoras:', err); // Manejo de errores
-        throw err; // Propaga el error para que el renderizado lo maneje
-      });
-  },
+  getPrinters: () => invokeIPC('get-printers'),
 });

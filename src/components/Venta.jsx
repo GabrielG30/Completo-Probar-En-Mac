@@ -53,9 +53,28 @@ function Ventas() {
     localStorage.setItem('impresoraPredeterminada', selectedPrinter); // Guardar en localStorage
   };
 
-  const iniciarVenta = () => {
-    setVentaIniciada(true);
-    setError("");
+  // Función para actualizar el inventario desde la base de datos
+  const actualizarInventario = async () => {
+    try {
+      const inventarioActualizado = await window.electron.readInventario();
+      setInventario(inventarioActualizado); // Actualiza el estado del inventario
+      console.log('Inventario actualizado correctamente.');
+    } catch (error) {
+      console.error('Error al actualizar el inventario:', error.message);
+      setError("Error al actualizar el inventario. Intenta nuevamente.");
+    }
+  };
+
+  const iniciarVenta = async () => {
+    try {
+      // Actualizar el inventario antes de iniciar la venta
+      await actualizarInventario();
+      setVentaIniciada(true); // Iniciar la venta
+      setError(""); // Limpiar mensajes de error
+    } catch (error) {
+      console.error('Error al iniciar la venta:', error);
+      setError("Error al iniciar la venta. Intenta nuevamente.");
+    }
   };
 
   const agregarProducto = () => {
