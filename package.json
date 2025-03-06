@@ -60,6 +60,7 @@
       "preload.js"
     ],
     "win": {
+       "icon": "public/1.ico",
       "target": "nsis", 
       "arch": "x64"
     }
