@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from "react"; // Añadimos useRef
-import { FaCog, FaPlus } from "react-icons/fa"; // Importar ícono de "+"
+import React, { useEffect, useState, useRef } from "react";
+import { FaCog, FaPlus } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import "./Inventario.css";
 
@@ -9,15 +9,13 @@ const Inventario = () => {
   const [columnMapping, setColumnMapping] = useState({ nombre: "", codigo: "", precio: "", stock: "" });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false); // Modal para agregar producto
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [searchCode, setSearchCode] = useState("");
   const [productToEdit, setProductToEdit] = useState(null);
-  const [newProduct, setNewProduct] = useState({ nombre: "", codigo: "", precio: "", stock: "" }); // Estado para el nuevo producto
+  const [newProduct, setNewProduct] = useState({ nombre: "", codigo: "", precio: "", stock: "" });
 
-  // Referencia para el campo de búsqueda
   const searchInputRef = useRef(null);
 
-  // Enfocar automáticamente el campo de búsqueda al cargar el componente
   useEffect(() => {
     if (searchInputRef.current) {
       searchInputRef.current.focus();
@@ -37,24 +35,20 @@ const Inventario = () => {
     }
   };
 
-  // Función para abrir el modal de agregar producto
   const openAddProductModal = () => {
     setIsAddProductModalOpen(true);
   };
 
-  // Función para cerrar el modal de agregar producto
   const closeAddProductModal = () => {
     setIsAddProductModalOpen(false);
-    setNewProduct({ nombre: "", codigo: "", precio: "", stock: "" }); // Limpiar el formulario
+    setNewProduct({ nombre: "", codigo: "", precio: "", stock: "" });
   };
 
-  // Función para manejar cambios en el formulario de nuevo producto
   const handleNewProductChange = (e) => {
     const { name, value } = e.target;
     setNewProduct({ ...newProduct, [name]: value });
   };
 
-  // Función para guardar el nuevo producto en la base de datos
   const saveNewProduct = async () => {
     const { nombre, codigo, precio, stock } = newProduct;
 
@@ -63,10 +57,17 @@ const Inventario = () => {
       return;
     }
 
+    const newProductData = [{
+      nombre,
+      codigo,
+      precio: parseFloat(precio).toFixed(2),
+      stock: parseInt(stock)
+    }];
+
     try {
-      await window.electron.insertInventario([{ nombre, codigo, precio: parseFloat(precio), stock: parseInt(stock) }]);
-      closeAddProductModal(); // Cerrar el modal
-      cargarInventarioDesdeDB(); // Recargar el inventario
+      await window.electron.insertInventario(newProductData);
+      closeAddProductModal();
+      cargarInventarioDesdeDB();
     } catch (error) {
       console.error("Error al guardar el nuevo producto:", error);
       alert("Hubo un error al guardar el producto. Intenta nuevamente.");
@@ -124,7 +125,6 @@ const Inventario = () => {
       const precio = parseFloat(row[precioIndex]) || 0.0;
       const stock = parseInt(row[stockIndex]) || 0;
 
-      // Solo agregamos el producto si tiene nombre y código
       if (nombre && codigo) {
         return {
           nombre: nombre,
@@ -133,8 +133,8 @@ const Inventario = () => {
           stock: stock,
         };
       }
-      return null; // Si no tiene nombre o código, no lo agregamos
-    }).filter(product => product !== null); // Filtramos los productos nulos
+      return null;
+    }).filter(product => product !== null);
 
     try {
       await window.electron.insertInventario(mappedInventario);
@@ -165,7 +165,6 @@ const Inventario = () => {
     }
   };
 
-  // Función para manejar la búsqueda automática al presionar "Enter"
   const handleSearchKeyPress = (e) => {
     if (e.key === "Enter") {
       handleSearch();
@@ -173,13 +172,23 @@ const Inventario = () => {
   };
 
   const handleSearch = () => {
-    const product = inventario.find(item => item.codigo === searchCode);
+    const product = inventario.find(item => item.codigo === searchCode.trim());
     if (product) {
-      setProductToEdit(product); // Si encuentra el producto, lo prepara para editar
+      setProductToEdit(product);
     } else {
       alert("Producto no encontrado");
+      setSearchCode(""); // Limpiar el campo de búsqueda
+      if (searchInputRef.current) {
+        searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda
+      }
     }
-    setSearchCode(""); // Limpiar la barra de búsqueda después de buscar
+  };
+
+  const closeEditModal = () => {
+    setProductToEdit(null);
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
   };
 
   const handleEditProduct = async () => {
@@ -193,16 +202,30 @@ const Inventario = () => {
       try {
         await window.electron.updateInventario(updatedProduct);
         cargarInventarioDesdeDB();
-        setProductToEdit(null); // Cierra el modal de edición
+        closeEditModal();
       } catch (error) {
         console.error("Error al editar el producto:", error);
       }
     }
   };
 
+  const deleteProduct = async (codigo) => {
+    try {
+      await window.electron.deleteProducto(codigo);
+      cargarInventarioDesdeDB();
+      closeEditModal();
+      setSearchCode(""); // Limpiar el campo de búsqueda
+      if (searchInputRef.current) {
+        searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda
+      }
+    } catch (error) {
+      console.error("Error al eliminar el producto:", error);
+      alert("Hubo un error al eliminar el producto. Intenta nuevamente.");
+    }
+  };
+
   return (
     <div className="inventario-container">
-      {/* Contenedor para los íconos */}
       <div className="icon-container">
         <div className="config-icon" onClick={() => setIsModalOpen(true)}>
           <FaCog size={30} />
@@ -250,7 +273,6 @@ const Inventario = () => {
         </div>
       )}
 
-      {/* Modal para agregar producto */}
       {isAddProductModalOpen && (
         <div className="modal">
           <div className="modal-content">
@@ -303,9 +325,9 @@ const Inventario = () => {
           placeholder="Ingresa código de barras"
           value={searchCode}
           onChange={(e) => setSearchCode(e.target.value)}
-          onKeyPress={handleSearchKeyPress} // Detectar "Enter"
-          ref={searchInputRef} // Referencia para enfocar automáticamente
-          autoFocus // Enfocar automáticamente
+          onKeyPress={handleSearchKeyPress}
+          ref={searchInputRef}
+          autoFocus
         />
         <button onClick={handleSearch}>Buscar</button>
       </div>
@@ -313,7 +335,7 @@ const Inventario = () => {
       {productToEdit && (
         <div className="modal">
           <div className="modal-content">
-            <span className="close" onClick={() => setProductToEdit(null)}>&times;</span>
+            <span className="close" onClick={closeEditModal}>&times;</span>
             <h3>Editar Producto</h3>
             <div>
               <label>Nombre:</label>
@@ -348,6 +370,7 @@ const Inventario = () => {
               />
             </div>
             <button onClick={handleEditProduct}>Guardar Cambios</button>
+            <button onClick={() => deleteProduct(productToEdit.codigo)} style={{ marginLeft: '10px', backgroundColor: 'red', color: 'white' }}>Eliminar Producto</button>
           </div>
         </div>
       )}

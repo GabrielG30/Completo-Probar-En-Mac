@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useInventario } from "./InventarioContext";
 import "./Consulta.css"; // Importa los estilos
-import BarcodeScannerComponent from "react-qr-barcode-scanner"; // Librería para escaneo de código de barras
 
 const Consulta = () => {
   const { inventario } = useInventario();
@@ -9,9 +8,19 @@ const Consulta = () => {
   const [productoEncontrado, setProductoEncontrado] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Referencia para el campo de búsqueda
+  const searchInputRef = useRef(null);
+
+  // Enfocar automáticamente el campo de búsqueda al cargar el componente
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
+
   // Buscar producto por código
-  const handleSearchProduct = () => {
-    const cleanedCodigo = codigoBuscar.trim().toLowerCase();
+  const handleSearchProduct = (codigo) => {
+    const cleanedCodigo = codigo.trim().toLowerCase();
 
     const producto = inventario.find(item => {
       const itemCodigo = String(item.codigo).trim().toLowerCase();
@@ -24,31 +33,33 @@ const Consulta = () => {
     } else {
       alert("Producto no encontrado");
     }
+
+    setCodigoBuscar(""); // Limpiar la barra de búsqueda después de buscar
+    if (searchInputRef.current) {
+      searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda
+    }
   };
 
   // Cerrar la ventana emergente
   const closeModal = () => {
     setProductoEncontrado(null);
     setIsModalOpen(false);
+    if (searchInputRef.current) {
+      searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda al cerrar el modal
+    }
+  };
+
+  // Manejar la tecla "Enter" en el campo de búsqueda
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      handleSearchProduct(codigoBuscar);
+    }
   };
 
   return (
     <div className="consulta-container dark-mode">
       <div className="consulta-box">
         <h2 className="consulta-title">Buscar Producto</h2>
-
-        {/* Sección de escaneo de código de barras */}
-        <BarcodeScannerComponent
-          onUpdate={(err, result) => {
-            if (result) {
-              setCodigoBuscar(result.text); // Actualizar el código con lo escaneado
-              handleSearchProduct(); // Realizar la búsqueda cuando se escanea un producto
-            }
-          }}
-          width="100%"
-          height={300}
-          style={{ marginBottom: "20px", backgroundColor: "#f0f0f0" }}
-        />
 
         {/* Input manual para código de barras */}
         <div className="input-container">
@@ -57,8 +68,11 @@ const Consulta = () => {
             placeholder="Escanea o ingresa el código"
             value={codigoBuscar}
             onChange={(e) => setCodigoBuscar(e.target.value)}
+            onKeyPress={handleKeyPress} // Manejar la tecla "Enter"
+            ref={searchInputRef} // Referencia para enfocar automáticamente
+            autoFocus // Enfocar automáticamente
           />
-          <button onClick={handleSearchProduct}>Buscar</button>
+          <button onClick={() => handleSearchProduct(codigoBuscar)}>Buscar</button>
         </div>
 
         {/* Modal de producto encontrado */}

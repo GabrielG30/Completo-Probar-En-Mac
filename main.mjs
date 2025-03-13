@@ -4,7 +4,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as XLSX from 'xlsx'; // Para leer archivos Excel
 import fs from 'fs'; // Para manejar el sistema de archivos
-import printer from 'node-printer'; // Para imprimir en una impresora térmica
+import pdfToPrinter from 'pdf-to-printer'; // Importa el módulo como un paquete completo
+import puppeteer from "puppeteer";
+
+const { getPrinters, print } = pdfToPrinter; // Extrae las funciones necesarias
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,7 +62,8 @@ function createWindow() {
     width: 800,
     height: 600,
     icon: path.join(__dirname, 'public', '1.icns'),
-    title: 'Mi Punto de Venta',
+    icon: path.join(__dirname, 'public', '1.ico'),
+    title: 'Farmacia R&R',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -74,14 +78,8 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173'); // Desarrollo
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html')); // Producción
+    mainWindow.loadFile(path.join(__dirname, 'dist/index.html')); // Producción
   }
-
-  // mainWindow.webContents.openDevTools(); // Descomenta para abrir las herramientas de desarrollo
-
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show();
-  });
 }
 
 // Leer inventario
@@ -200,44 +198,105 @@ ipcMain.handle('updateStock', async (event, codigo, cantidad) => {
   });
 });
 
-// Función para imprimir factura
-const imprimirFactura = (factura, printerName) => {
-  const facturaFormateada = `
-----------------------------------------
-          Farmacia R&R
-----------------------------------------
-Fecha: ${new Date().toLocaleString()}
-----------------------------------------
-Producto           Cant.  Precio  Total
-----------------------------------------
-${factura.productos.map(p => 
-  `${p.nombre.padEnd(20)} ${p.stock.toString().padStart(3)}     Q${p.precio.toFixed(2).padStart(5)}   Q${(p.precio * p.stock).toFixed(2).padStart(5)}`
-).join('\n')}
-----------------------------------------
-Total: Q${factura.total.toFixed(2)}
-Pago: Q${factura.pago.toFixed(2)}
-Vuelto: Q${factura.vuelto.toFixed(2)}
-----------------------------------------
-Método de pago: ${factura.metodoPago === "tarjeta" ? "Tarjeta (+6%)" : "Efectivo"}
-----------------------------------------
-¡Gracias por su compra!
-----------------------------------------
-`;
-
+// Obtener lista de impresoras
+ipcMain.handle('get-printers', async () => {
   try {
-    printer.printDirect({
-      data: facturaFormateada,
-      printer: printerName,
-      type: 'RAW',
-      success: (jobID) => {
-        console.log('Factura enviada a la impresora térmica. Job ID:', jobID);
-      },
-      error: (err) => {
-        console.error('Error al imprimir:', err);
-      },
-    });
+    console.log('Intentando obtener la lista de impresoras...');
+    const printers = await getPrinters(); // Obtener la lista de impresoras
+    console.log('Lista de impresoras obtenida:', printers);
+    return printers;
   } catch (error) {
-    console.error('Error al intentar imprimir:', error.message);
+    console.error('Error al obtener las impresoras:', error.message);
+    console.error('Error stack trace:', error.stack);
+    return [];
+  }
+});
+
+const imprimirFactura = async (factura, printerName) => {
+  try {
+    console.log("📄 Generando factura en PDF...");
+
+    // Crear un navegador sin cabeza (headless)
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+
+    // Ajustar el viewport para evitar margen superior
+    await page.setViewport({
+      width: 192, // 48mm ≈ 192px a 96 DPI
+      height: 1 // Altura mínima para forzar la impresión en la parte superior
+    });
+
+    // Construir el HTML de la factura con margen CERO
+    const facturaHTML = `
+      <div style="
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        width: 48mm;
+        padding: 0;
+        margin: 0;
+        line-height: 1.2;
+        display: inline-block;
+        clip-path: inset(0px 0px 0px 0px);
+      ">
+        <h3 style="text-align: center; margin: 0; padding: 0;">Farmacia R&R</h3>
+        <p style="text-align: center; margin: 0;">Fecha: ${new Date().toLocaleString()}</p>
+        <hr style="margin: 1px 0;" />
+        <table style="width: 100%; font-size: 11px; border-collapse: collapse; margin: 0;">
+          <thead>
+            <tr>
+              <th style="text-align: left;">Producto</th>
+              <th style="text-align: center;">Cant</th>
+              <th style="text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${factura.productos.map(p => `
+              <tr>
+                <td>${p.nombre}</td>
+                <td style="text-align: center;">${p.stock}</td>
+                <td style="text-align: right;">Q${(p.precio * p.stock).toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <hr style="margin: 1px 0;" />
+        <p>Total: Q${factura.total.toFixed(2)}</p>
+        <p>Pago: Q${factura.pago.toFixed(2)}</p>
+        <hr style="margin: 1px 0;" />
+        <p style="text-align: center;">¡Gracias por su compra!</p>
+      </div>
+    `;
+
+    // Cargar el HTML en Puppeteer
+    await page.setContent(facturaHTML, { waitUntil: "domcontentloaded" });
+
+    // Ruta del archivo PDF
+    const pdfPath = path.join(process.cwd(), "factura.pdf");
+
+    // Generar el PDF sin márgenes extra
+    await page.pdf({
+      path: pdfPath,
+      width: "48mm", // Ancho exacto de la impresora térmica
+      height: "auto", // La altura se ajusta al contenido
+      margin: { top: "10mm", right: "0mm", bottom: "0mm", left: "0mm" }, // ❌ ELIMINA márgenes extra
+      printBackground: true,
+      preferCSSPageSize: true // ❗ Importante para evitar márgenes adicionales
+    });
+
+    // Cerrar Puppeteer
+    await browser.close();
+
+    console.log(`✅ PDF generado correctamente: ${pdfPath}`);
+
+    // Enviar el PDF a la impresora sin reducir el tamaño
+    await pdfToPrinter.print(pdfPath, {
+      printer: printerName,
+      options: ["-o fit-to-page", "-o media=Custom.48x297mm"]
+    });
+
+    console.log("✅ Factura enviada a la impresora térmica sin margen superior.");
+  } catch (error) {
+    console.error("❌ Error al intentar imprimir:", error.message);
   }
 };
 
@@ -299,22 +358,12 @@ ipcMain.handle('realizar-venta', async (event, venta, printerName) => {
     stmt.finalize();
 
     console.log('Intentando imprimir factura...');
-    imprimirFactura({ productos: venta.productos, total, pago: venta.pagoConEfectivo, vuelto, metodoPago: venta.metodoPago }, printerName);
+    await imprimirFactura({ productos: venta.productos, total, pago: venta.pagoConEfectivo, vuelto, metodoPago: venta.metodoPago }, printerName);
 
     return { total, vuelto };
   } catch (error) {
     console.error('Error al realizar la venta:', error.message);
     throw new Error('Error al realizar la venta. Intenta nuevamente.');
-  }
-});
-
-app.whenReady().then(() => {
-  createWindow();
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
   }
 });
 
@@ -364,26 +413,51 @@ ipcMain.handle('insert-inventario', async (event, productos) => {
   });
 });
 
-// Actualizar inventario (editar producto)
+// Manejador de IPC para actualizar un producto del inventario
 ipcMain.handle('update-inventario', async (event, producto) => {
-  console.log('Actualizando producto:', producto.codigo);
   return new Promise((resolve, reject) => {
-    const stmt = db.prepare(`
-      UPDATE inventario
-      SET nombre = ?, precio = ?, stock = ?
-      WHERE codigo = ?
-    `);
+    const { codigo, nombre, precio, stock } = producto;
+    db.run(
+      'UPDATE inventario SET nombre = ?, precio = ?, stock = ? WHERE codigo = ?',
+      [nombre, precio, stock, codigo],
+      function (err) {
+        if (err) {
+          reject(err);
+        } else if (this.changes === 0) {
+          resolve('No se encontró el producto');
+        } else {
+          resolve('Producto actualizado correctamente');
+        }
+      }
+    );
+  });
+});
 
-    stmt.run(producto.nombre, producto.precio, producto.stock, producto.codigo, function(err) {
+// Manejador de IPC para eliminar un producto del inventario
+ipcMain.handle('delete-producto', async (event, codigo) => {
+  console.log(`Eliminando producto con código: ${codigo}`);
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM inventario WHERE codigo = ?', [codigo], function (err) {
       if (err) {
-        console.error('Error al actualizar producto:', err.message);
+        console.error('Error al eliminar el producto:', err.message);
         reject(err);
+      } else if (this.changes === 0) {
+        console.log('No se encontró el producto:', codigo);
+        resolve('No se encontró el producto');
       } else {
-        console.log(`Producto con código ${producto.codigo} actualizado.`);
-        resolve({ mensaje: 'Producto actualizado correctamente.' });
+        console.log(`Producto con código ${codigo} eliminado con éxito.`);
+        resolve('Producto eliminado con éxito');
       }
     });
-
-    stmt.finalize();
   });
+});
+
+app.whenReady().then(() => {
+  createWindow();
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react"; // Añadimos useRef
+import { useState, useEffect, useRef } from "react";
 import { useInventario } from "./InventarioContext";
 import "./Ventas.css";
-import { FaCog } from "react-icons/fa"; // Importar ícono de tuerca
+import { FaCog } from "react-icons/fa";
 
 function Ventas() {
   const { inventario, setInventario } = useInventario();
@@ -12,28 +12,25 @@ function Ventas() {
   const [factura, setFactura] = useState(null);
   const [ventaIniciada, setVentaIniciada] = useState(false);
   const [error, setError] = useState("");
-  const [impresoras, setImpresoras] = useState([]); // Lista de impresoras
-  const [impresoraSeleccionada, setImpresoraSeleccionada] = useState(""); // Impresora seleccionada
-  const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false); // Mostrar/ocultar menú de configuración
+  const [impresoras, setImpresoras] = useState([]);
+  const [impresoraSeleccionada, setImpresoraSeleccionada] = useState(localStorage.getItem('impresoraPredeterminada') || '');
+  const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
+  const [vuelto, setVuelto] = useState("0.00");
 
-  // Referencia para el campo de entrada del código de barras
   const codigoInputRef = useRef(null);
 
-  // Enfocar automáticamente el campo de entrada cuando se inicia una venta
   useEffect(() => {
     if (ventaIniciada && codigoInputRef.current) {
       codigoInputRef.current.focus();
     }
   }, [ventaIniciada]);
 
-  // Obtener la lista de impresoras al cargar el componente
   useEffect(() => {
     const obtenerImpresoras = async () => {
       try {
         const printers = await window.electron.getPrinters();
         setImpresoras(printers);
 
-        // Cargar la impresora predeterminada guardada (si existe)
         const impresoraGuardada = localStorage.getItem('impresoraPredeterminada');
         if (impresoraGuardada) {
           setImpresoraSeleccionada(impresoraGuardada);
@@ -46,18 +43,25 @@ function Ventas() {
     obtenerImpresoras();
   }, []);
 
-  // Guardar la impresora seleccionada
+  useEffect(() => {
+    if (impresoraSeleccionada) {
+      localStorage.setItem('impresoraPredeterminada', impresoraSeleccionada);
+    }
+  }, [impresoraSeleccionada]);
+
   const handleImpresoraChange = (e) => {
-    const selectedPrinter = e.target.value;
-    setImpresoraSeleccionada(selectedPrinter);
-    localStorage.setItem('impresoraPredeterminada', selectedPrinter); // Guardar en localStorage
+    setImpresoraSeleccionada(e.target.value);
+    setMostrarConfiguracion(false);
   };
 
-  // Función para actualizar el inventario desde la base de datos
+  const togglePrinterConfig = () => {
+    setMostrarConfiguracion(prev => !prev);
+  };
+
   const actualizarInventario = async () => {
     try {
       const inventarioActualizado = await window.electron.readInventario();
-      setInventario(inventarioActualizado); // Actualiza el estado del inventario
+      setInventario(inventarioActualizado);
       console.log('Inventario actualizado correctamente.');
     } catch (error) {
       console.error('Error al actualizar el inventario:', error.message);
@@ -67,10 +71,9 @@ function Ventas() {
 
   const iniciarVenta = async () => {
     try {
-      // Actualizar el inventario antes de iniciar la venta
       await actualizarInventario();
-      setVentaIniciada(true); // Iniciar la venta
-      setError(""); // Limpiar mensajes de error
+      setVentaIniciada(true);
+      setError("");
     } catch (error) {
       console.error('Error al iniciar la venta:', error);
       setError("Error al iniciar la venta. Intenta nuevamente.");
@@ -112,7 +115,6 @@ function Ventas() {
     setCodigo("");
   };
 
-  // Detectar cuando se presiona "Enter" en el campo de código de barras
   const handleCodigoKeyPress = (e) => {
     if (e.key === "Enter") {
       agregarProducto();
@@ -141,7 +143,7 @@ function Ventas() {
 
   const calcularTotal = () => {
     let total = productos.reduce((sum, prod) => sum + prod.precio * prod.cantidad, 0);
-    return metodoPago === "tarjeta" ? (total * 1.06).toFixed(2) : total.toFixed(2);
+    return metodoPago === "tarjeta" ? (total * 1.05).toFixed(2) : total.toFixed(2); // Cambiado de 1.06 a 1.05
   };
 
   const calcularVuelto = () => {
@@ -162,46 +164,65 @@ function Ventas() {
     }
 
     const total = calcularTotal();
-    const vuelto = calcularVuelto();
+    const vueltoCalculado = calcularVuelto();
+    setVuelto(vueltoCalculado);
 
     try {
       console.log("Iniciando proceso de venta...");
 
-      // Actualizar el stock en la base de datos
       for (const prod of productos) {
         console.log(`Actualizando stock para producto ${prod.codigo}...`);
         const resultado = await window.electron.updateStock(prod.codigo, prod.cantidad);
-        console.log('Resultado de actualización:', resultado); // Depuración: Verifica el resultado
+        console.log('Resultado de actualización:', resultado);
         if (resultado === 'No se encontró el producto o stock insuficiente') {
           throw new Error(`Producto no encontrado o stock insuficiente: ${prod.codigo}`);
         }
       }
 
-      // Si todo sale bien, mostrar la factura
       const nuevaFactura = {
         productos,
         total,
         metodoPago,
         pago,
-        vuelto,
-        fecha: new Date().toLocaleString()
+        vuelto: vueltoCalculado,
+        fecha: new Date().toLocaleString(),
       };
       setFactura(nuevaFactura);
 
-      // Actualizar el inventario en el estado
-      setInventario(prev => prev.map(item => {
-        const productoVendido = productos.find(prod => prod.codigo === item.codigo);
-        if (productoVendido) {
-          return { ...item, stock: item.stock - productoVendido.cantidad };
-        }
-        return item;
-      }));
+      imprimirFactura(nuevaFactura);
 
-      alert("Venta realizada con éxito");
+      setVentaIniciada(false);
+      setProductos([]);
+      setCodigo("");
+      setPago("");
+      setMetodoPago("efectivo");
+      setError("");
     } catch (error) {
       console.error("Error al realizar la venta:", error);
       setError(error.message || "Error al realizar la venta. Intenta nuevamente.");
     }
+  };
+
+  const imprimirFactura = (factura) => {
+    const facturaHTML = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h3 style="text-align: center;">Farmacia R&R</h3>
+        <p style="text-align: center;">Fecha: ${factura.fecha}</p>
+        <hr />
+        ${factura.productos.map(prod => `
+          <p>${prod.nombre} x ${prod.cantidad} - Q${(prod.precio * prod.cantidad).toFixed(2)}</p>
+        `).join('')}
+        <hr />
+        <p>Total: Q${factura.total}</p>
+        <p>Pago: Q${factura.pago}</p>
+        ${factura.metodoPago === "efectivo" ? `<p>Vuelto: Q${factura.vuelto}</p>` : ''}
+        <p>Método de pago: ${factura.metodoPago === "tarjeta" ? "Tarjeta (+5%)" : "Efectivo"}</p>
+        <hr />
+        <p style="text-align: center;">¡Gracias por su compra!</p>
+      </div>
+    `;
+
+    window.electron.printInvoice(facturaHTML, impresoraSeleccionada);
   };
 
   const cerrarFactura = () => {
@@ -218,11 +239,11 @@ function Ventas() {
     <div className="ventas-container dark-mode">
       <h2>Caja</h2>
 
-      {/* Ícono de configuración */}
       <div className="configuracion-impresora">
         <FaCog
           className="configuracion-icono"
-          onClick={() => setMostrarConfiguracion(!mostrarConfiguracion)}
+          onClick={togglePrinterConfig}
+          style={{ cursor: 'pointer' }}
         />
         {mostrarConfiguracion && (
           <div className="configuracion-menu">
@@ -252,9 +273,9 @@ function Ventas() {
               placeholder="Escanear código"
               value={codigo}
               onChange={(e) => setCodigo(e.target.value)}
-              onKeyPress={handleCodigoKeyPress} // Detectar "Enter"
-              ref={codigoInputRef} // Referencia para enfocar automáticamente
-              autoFocus // Enfocar automáticamente
+              onKeyPress={handleCodigoKeyPress}
+              ref={codigoInputRef}
+              autoFocus
             />
             <button className="agregar-btn" onClick={agregarProducto}>Agregar</button>
           </div>
@@ -290,7 +311,7 @@ function Ventas() {
             <h3>Total: Q{calcularTotal()}</h3>
             <select onChange={(e) => setMetodoPago(e.target.value)}>
               <option value="efectivo">Efectivo</option>
-              <option value="tarjeta">Tarjeta (+6%)</option>
+              <option value="tarjeta">Tarjeta (+5%)</option>
             </select>
             {metodoPago === "efectivo" && (
               <input
@@ -300,7 +321,7 @@ function Ventas() {
                 onChange={(e) => setPago(e.target.value)}
               />
             )}
-            <h3>Vuelto: Q{calcularVuelto()}</h3>
+            {metodoPago === "efectivo" && <h3>Vuelto: Q{calcularVuelto()}</h3>}
             <button className="finalizar-venta" onClick={finalizarVenta}>Finalizar Venta</button>
           </div>
         </>
@@ -322,7 +343,7 @@ function Ventas() {
               <p>Total: Q{factura.total}</p>
               <p>Pago: Q{factura.pago}</p>
               <p>Vuelto: Q{factura.vuelto}</p>
-              <p>Método de pago: {factura.metodoPago === "tarjeta" ? "Tarjeta (+6%)" : "Efectivo"}</p>
+              <p>Método de pago: {factura.metodoPago === "tarjeta" ? "Tarjeta (+5%)" : "Efectivo"}</p>
             </div>
             <hr />
             <p>¡Gracias por su compra!</p>
