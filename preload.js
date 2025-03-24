@@ -62,4 +62,37 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Obtener la lista de impresoras
   getPrinters: () => invokeIPC('get-printers'),
+
+  // Función para eliminar un producto del inventario por código
+  deleteProducto: (codigo) => ipcRenderer.invoke('delete-producto', codigo),
+
+  // Nueva función para obtener ventas por período
+  getVentasPorPeriodo: (periodo) => ipcRenderer.invoke('getVentasPorPeriodo', periodo),
+
+  // Nueva función para generar un corte
+  generarCorte: (tipoCorte, nombreNegocio) => ipcRenderer.invoke('generarCorte', tipoCorte, nombreNegocio),
+
+  // Nueva función para imprimir un PDF
+  imprimirCorte: (pdfPath) => {
+    if (!pdfPath) {
+      console.error('Error: pdfPath no válido');
+      throw new Error('La ruta del PDF es requerida');
+    }
+    return invokeIPC('imprimir-corte', pdfPath);
+  },
+
+  // Nueva función para buscar un producto por código
+  buscarProducto: (codigo) => ipcRenderer.invoke('buscar-producto', codigo),
+
+  // Nueva función para descargar un PDF
+  descargarPDF: (pdfPath) => ipcRenderer.invoke('abrirPDF', pdfPath),
+
+  // Nueva función para manejar el evento de venta realizada
+  onVentaRealizada: (callback) => ipcRenderer.on('ventaRealizada', callback),
+
+  // Limpiar eventos
+  removeListener: (channel, listener) => ipcRenderer.removeListener(channel, listener),
+
+  // Nueva función para abrir un PDF
+  abrirPDF: (pdfPath) => ipcRenderer.invoke('abrirPDF', pdfPath),
 });

@@ -106,7 +106,7 @@
 
 .inventario-table th {
   background-color: #3498DB; /* Azul medio */
-  color: white;
+  color: rgb(87, 146, 255);
 }
 
 /* Botones de acción */

@@ -6,7 +6,7 @@ import { FaCog } from "react-icons/fa";
 function Ventas() {
   const { inventario, setInventario } = useInventario();
   const [productos, setProductos] = useState([]);
-  const [codigo, setCodigo] = useState("");
+  const [busqueda, setBusqueda] = useState("");
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [pago, setPago] = useState("");
   const [factura, setFactura] = useState(null);
@@ -16,12 +16,35 @@ function Ventas() {
   const [impresoraSeleccionada, setImpresoraSeleccionada] = useState(localStorage.getItem('impresoraPredeterminada') || '');
   const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
   const [vuelto, setVuelto] = useState("0.00");
+  const [productosEncontrados, setProductosEncontrados] = useState([]);
+  const [productosSeleccionados, setProductosSeleccionados] = useState([]);
+  const [modalIsOpen, setModalIsOpen] = useState(false);
+  const [nombreNegocio, setNombreNegocio] = useState(localStorage.getItem('nombreNegocio') || '');
+  const [ventaEnProceso, setVentaEnProceso] = useState(false); // Nuevo estado para controlar el proceso de venta
 
-  const codigoInputRef = useRef(null);
+  const busquedaInputRef = useRef(null);
 
   useEffect(() => {
-    if (ventaIniciada && codigoInputRef.current) {
-      codigoInputRef.current.focus();
+    if (modalIsOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [modalIsOpen]);
+
+  useEffect(() => {
+    if (!modalIsOpen && busquedaInputRef.current) {
+      busquedaInputRef.current.focus();
+    }
+  }, [modalIsOpen]);
+
+  useEffect(() => {
+    if (ventaIniciada && busquedaInputRef.current) {
+      busquedaInputRef.current.focus();
     }
   }, [ventaIniciada]);
 
@@ -54,6 +77,15 @@ function Ventas() {
     setMostrarConfiguracion(false);
   };
 
+  const handleNombreNegocioChange = (e) => {
+    setNombreNegocio(e.target.value);
+  };
+
+  const guardarNombreNegocio = () => {
+    localStorage.setItem('nombreNegocio', nombreNegocio);
+    setMostrarConfiguracion(false); // Cerrar el menú de configuración
+  };
+
   const togglePrinterConfig = () => {
     setMostrarConfiguracion(prev => !prev);
   };
@@ -80,44 +112,59 @@ function Ventas() {
     }
   };
 
-  const agregarProducto = () => {
-    if (!codigo.trim()) {
-      setError("Por favor, ingresa un código válido.");
+  const agregarProducto = (producto) => {
+    if (!producto) {
+      setError("Por favor, selecciona un producto válido.");
       return;
     }
 
-    const productoEncontrado = inventario.find(item => String(item.codigo).trim() === codigo.trim());
-    if (productoEncontrado) {
-      if (productoEncontrado.stock <= 0) {
-        setError("Stock insuficiente para este producto.");
+    if (producto.stock <= 0) {
+      setError("Stock insuficiente para este producto.");
+      return;
+    }
+
+    setProductos(prev => {
+      const existe = prev.find(prod => prod.codigo === producto.codigo);
+      if (existe) {
+        if (existe.cantidad >= producto.stock) {
+          setError("No hay suficiente stock para agregar más.");
+          return prev;
+        }
+        return prev.map(prod =>
+          prod.codigo === producto.codigo
+            ? { ...prod, cantidad: prod.cantidad + 1 }
+            : prod
+        );
+      }
+      return [...prev, { ...producto, cantidad: 1 }];
+    });
+    setError("");
+    setBusqueda("");
+    setProductosEncontrados([]);
+  };
+
+  const buscarProducto = () => {
+    if (busqueda.trim()) {
+      const productosEncontrados = inventario.filter(item =>
+        item.codigo.toLowerCase().includes(busqueda.trim().toLowerCase()) ||
+        item.nombre.toLowerCase().includes(busqueda.trim().toLowerCase())
+      );
+
+      if (productosEncontrados.length === 0) {
+        setError("Producto no encontrado.");
+        setBusqueda(""); // Limpia el campo de búsqueda
+        setProductosEncontrados([]);
         return;
       }
 
-      setProductos(prev => {
-        const existe = prev.find(prod => prod.codigo === productoEncontrado.codigo);
-        if (existe) {
-          if (existe.cantidad >= productoEncontrado.stock) {
-            setError("No hay suficiente stock para agregar más.");
-            return prev;
-          }
-          return prev.map(prod =>
-            prod.codigo === productoEncontrado.codigo
-              ? { ...prod, cantidad: prod.cantidad + 1 }
-              : prod
-          );
-        }
-        return [...prev, { ...productoEncontrado, cantidad: 1 }];
-      });
-      setError("");
-    } else {
-      setError("Producto no encontrado.");
+      setProductosEncontrados(productosEncontrados);
+      setModalIsOpen(true);
     }
-    setCodigo("");
   };
 
-  const handleCodigoKeyPress = (e) => {
+  const handleBusquedaKeyPress = (e) => {
     if (e.key === "Enter") {
-      agregarProducto();
+      buscarProducto();
     }
   };
 
@@ -141,9 +188,13 @@ function Ventas() {
     setError("");
   };
 
+  const eliminarProducto = (codigo) => {
+    setProductos(prev => prev.filter(prod => prod.codigo !== codigo));
+  };
+
   const calcularTotal = () => {
     let total = productos.reduce((sum, prod) => sum + prod.precio * prod.cantidad, 0);
-    return metodoPago === "tarjeta" ? (total * 1.05).toFixed(2) : total.toFixed(2); // Cambiado de 1.06 a 1.05
+    return metodoPago === "tarjeta" ? (total * 1.05).toFixed(2) : total.toFixed(2);
   };
 
   const calcularVuelto = () => {
@@ -153,60 +204,66 @@ function Ventas() {
   };
 
   const finalizarVenta = async () => {
-    if (productos.length === 0) {
-      setError("No hay productos en la venta.");
-      return;
-    }
-
-    if (metodoPago === "efectivo" && (!pago || parseFloat(pago) < parseFloat(calcularTotal()))) {
-      setError("La cantidad pagada es insuficiente.");
-      return;
-    }
-
-    const total = calcularTotal();
-    const vueltoCalculado = calcularVuelto();
-    setVuelto(vueltoCalculado);
+    if (ventaEnProceso) return; // Evitar múltiples clics si ya está en proceso
 
     try {
-      console.log("Iniciando proceso de venta...");
+      setVentaEnProceso(true); // Indicar que la venta está en proceso
 
-      for (const prod of productos) {
-        console.log(`Actualizando stock para producto ${prod.codigo}...`);
-        const resultado = await window.electron.updateStock(prod.codigo, prod.cantidad);
-        console.log('Resultado de actualización:', resultado);
-        if (resultado === 'No se encontró el producto o stock insuficiente') {
-          throw new Error(`Producto no encontrado o stock insuficiente: ${prod.codigo}`);
-        }
+      // Actualizar el inventario antes de finalizar la venta
+      await actualizarInventario();
+
+      const total = calcularTotal();
+      const vueltoCalculado = calcularVuelto();
+
+      const venta = {
+        productos: productos.map(prod => ({
+          codigo: prod.codigo,
+          nombre: prod.nombre,
+          cantidad: prod.cantidad,
+          precio: prod.precio,
+        })),
+        total: parseFloat(total),
+        metodoPago,
+        pago: parseFloat(pago),
+        vuelto: parseFloat(vueltoCalculado),
+        nombreNegocio, // Pasar el nombre del negocio configurado
+      };
+
+      // Enviar la venta al backend
+      const resultado = await window.electron.realizarVenta(venta, impresoraSeleccionada);
+
+      if (!resultado.success) {
+        throw new Error("Error al registrar la venta en la base de datos.");
       }
 
+      console.log("Venta registrada correctamente.");
+
+      // Generar la factura para mostrar en pantalla
       const nuevaFactura = {
-        productos,
-        total,
-        metodoPago,
-        pago,
-        vuelto: vueltoCalculado,
+        ...venta,
         fecha: new Date().toLocaleString(),
       };
       setFactura(nuevaFactura);
 
-      imprimirFactura(nuevaFactura);
-
+      // Limpiar los datos de la venta
       setVentaIniciada(false);
       setProductos([]);
-      setCodigo("");
+      setBusqueda("");
       setPago("");
       setMetodoPago("efectivo");
       setError("");
     } catch (error) {
-      console.error("Error al realizar la venta:", error);
-      setError(error.message || "Error al realizar la venta. Intenta nuevamente.");
+      console.error("Error al finalizar la venta:", error.message);
+      setError(error.message || "Error al finalizar la venta. Intenta nuevamente.");
+    } finally {
+      setVentaEnProceso(false); // Permitir nuevas ventas después de finalizar
     }
   };
 
   const imprimirFactura = (factura) => {
     const facturaHTML = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h3 style="text-align: center;">Farmacia R&R</h3>
+        ${factura.nombreNegocio ? `<h3 style="text-align: center;">${factura.nombreNegocio}</h3>` : ''}
         <p style="text-align: center;">Fecha: ${factura.fecha}</p>
         <hr />
         ${factura.productos.map(prod => `
@@ -228,10 +285,34 @@ function Ventas() {
   const cerrarFactura = () => {
     setFactura(null);
     setProductos([]);
-    setCodigo("");
+    setBusqueda("");
     setPago("");
     setMetodoPago("efectivo");
     setVentaIniciada(false);
+    setError("");
+  };
+
+  const handleProductoSeleccionado = (producto) => {
+    setProductosSeleccionados(prev => {
+      if (prev.includes(producto)) {
+        return prev.filter(p => p !== producto);
+      } else {
+        return [...prev, producto];
+      }
+    });
+  };
+
+  const confirmarSeleccion = () => {
+    productosSeleccionados.forEach(producto => agregarProducto(producto));
+    setProductosSeleccionados([]);
+    setModalIsOpen(false);
+  };
+
+  const cerrarModal = () => {
+    setModalIsOpen(false);
+    setBusqueda("");
+    setProductosEncontrados([]);
+    setProductosSeleccionados([]);
     setError("");
   };
 
@@ -259,6 +340,14 @@ function Ventas() {
                 </option>
               ))}
             </select>
+            <label>Nombre del negocio:</label>
+            <input
+              type="text"
+              value={nombreNegocio}
+              onChange={handleNombreNegocioChange}
+              placeholder="Ingrese el nombre del negocio"
+            />
+            <button onClick={guardarNombreNegocio}>Guardar</button>
           </div>
         )}
       </div>
@@ -270,16 +359,43 @@ function Ventas() {
           <div className="input-group">
             <input
               type="text"
-              placeholder="Escanear código"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              onKeyPress={handleCodigoKeyPress}
-              ref={codigoInputRef}
+              placeholder="Buscar por código o nombre"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyPress={handleBusquedaKeyPress}
+              ref={busquedaInputRef}
               autoFocus
             />
-            <button className="agregar-btn" onClick={agregarProducto}>Agregar</button>
+            <button className="agregar-btn" onClick={buscarProducto}>Buscar</button>
           </div>
           {error && <p className="error-message">{error}</p>}
+          {productosEncontrados.length > 0 && (
+            <div
+              className={`modal ${modalIsOpen ? 'is-open' : ''}`}
+              onClick={cerrarModal}
+            >
+              <div
+                className="modal-content"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="close" onClick={cerrarModal}>&times;</span>
+                <h3>Selecciona productos:</h3>
+                <ul>
+                  {productosEncontrados.map((prod, index) => (
+                    <li key={index}>
+                      <input
+                        type="checkbox"
+                        checked={productosSeleccionados.includes(prod)}
+                        onChange={() => handleProductoSeleccionado(prod)}
+                      />
+                      {prod.nombre} - {prod.codigo} - Q{prod.precio.toFixed(2)} - Estante: {prod.estante}
+                    </li>
+                  ))}
+                </ul>
+                <button className="confirmar-seleccion" onClick={confirmarSeleccion}>Aceptar</button>
+              </div>
+            </div>
+          )}
           <table className="productos-table">
             <thead>
               <tr>
@@ -287,6 +403,7 @@ function Ventas() {
                 <th>Cantidad</th>
                 <th>Precio</th>
                 <th>Total</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -303,6 +420,9 @@ function Ventas() {
                   </td>
                   <td>Q{prod.precio.toFixed(2)}</td>
                   <td>Q{(prod.precio * prod.cantidad).toFixed(2)}</td>
+                  <td>
+                    <button className="eliminar-btn" onClick={() => eliminarProducto(prod.codigo)}>X</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -330,7 +450,7 @@ function Ventas() {
       {factura && (
         <div className="factura-popup">
           <div className="factura-modal">
-            <h3>Farmacia R&R</h3>
+            {factura.nombreNegocio && <h3>{factura.nombreNegocio}</h3>}
             <p>Fecha: {factura.fecha}</p>
             <hr />
             {factura.productos.map((prod, index) => (

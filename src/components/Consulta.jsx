@@ -4,9 +4,10 @@ import "./Consulta.css"; // Importa los estilos
 
 const Consulta = () => {
   const { inventario } = useInventario();
-  const [codigoBuscar, setCodigoBuscar] = useState("");
-  const [productoEncontrado, setProductoEncontrado] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState(""); // Estado para la búsqueda
+  const [productosEncontrados, setProductosEncontrados] = useState([]); // Lista de productos encontrados
+  const [isModalOpen, setIsModalOpen] = useState(false); // Estado para el modal
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null); // Producto seleccionado para el modal
 
   // Referencia para el campo de búsqueda
   const searchInputRef = useRef(null);
@@ -18,41 +19,45 @@ const Consulta = () => {
     }
   }, []);
 
-  // Buscar producto por código
-  const handleSearchProduct = (codigo) => {
-    const cleanedCodigo = codigo.trim().toLowerCase();
+  // Buscar productos mientras el usuario escribe
+  useEffect(() => {
+    if (busqueda.trim()) {
+      const cleanedBusqueda = busqueda.trim().toLowerCase();
 
-    const producto = inventario.find(item => {
-      const itemCodigo = String(item.codigo).trim().toLowerCase();
-      return itemCodigo === cleanedCodigo;
-    });
+      const productosFiltrados = inventario.filter(item => {
+        const itemCodigo = String(item.codigo).trim().toLowerCase();
+        const itemNombre = item.nombre.trim().toLowerCase();
+        return itemCodigo.includes(cleanedBusqueda) || itemNombre.includes(cleanedBusqueda);
+      });
 
-    if (producto) {
-      setProductoEncontrado(producto);
-      setIsModalOpen(true); // Mostrar el modal con la info del producto
+      setProductosEncontrados(productosFiltrados);
     } else {
-      alert("Producto no encontrado");
+      setProductosEncontrados([]); // Si no hay búsqueda, limpia la lista
     }
-
-    setCodigoBuscar(""); // Limpiar la barra de búsqueda después de buscar
-    if (searchInputRef.current) {
-      searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda
-    }
-  };
-
-  // Cerrar la ventana emergente
-  const closeModal = () => {
-    setProductoEncontrado(null);
-    setIsModalOpen(false);
-    if (searchInputRef.current) {
-      searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda al cerrar el modal
-    }
-  };
+  }, [busqueda, inventario]);
 
   // Manejar la tecla "Enter" en el campo de búsqueda
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
-      handleSearchProduct(codigoBuscar);
+      setBusqueda(""); // Limpiar el campo de búsqueda al presionar Enter
+      if (searchInputRef.current) {
+        searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda
+      }
+    }
+  };
+
+  // Abrir el modal con la información del producto seleccionado
+  const openModal = (producto) => {
+    setProductoSeleccionado(producto);
+    setIsModalOpen(true);
+  };
+
+  // Cerrar la ventana emergente
+  const closeModal = () => {
+    setProductoSeleccionado(null);
+    setIsModalOpen(false);
+    if (searchInputRef.current) {
+      searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda al cerrar el modal
     }
   };
 
@@ -61,34 +66,53 @@ const Consulta = () => {
       <div className="consulta-box">
         <h2 className="consulta-title">Buscar Producto</h2>
 
-        {/* Input manual para código de barras */}
+        {/* Input manual para código de barras o nombre */}
         <div className="input-container">
           <input
             type="text"
-            placeholder="Escanea o ingresa el código"
-            value={codigoBuscar}
-            onChange={(e) => setCodigoBuscar(e.target.value)}
+            placeholder="Escanea o ingresa el código o nombre"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
             onKeyPress={handleKeyPress} // Manejar la tecla "Enter"
             ref={searchInputRef} // Referencia para enfocar automáticamente
             autoFocus // Enfocar automáticamente
           />
-          <button onClick={() => handleSearchProduct(codigoBuscar)}>Buscar</button>
         </div>
 
-        {/* Modal de producto encontrado */}
-        {isModalOpen && productoEncontrado && (
+        {/* Lista de productos encontrados */}
+        {productosEncontrados.length > 0 && (
+          <div className="productos-lista">
+            {productosEncontrados.map((producto) => (
+              <div
+                key={producto.codigo}
+                className="producto-item"
+                onClick={() => openModal(producto)} // Abrir modal al hacer clic en un producto
+              >
+                <p><strong>Nombre:</strong> {producto.nombre}</p>
+                <p><strong>Código:</strong> {producto.codigo}</p>
+                <p><strong>Precio:</strong> Q{producto.precio}</p>
+                <p><strong>Stock:</strong> {producto.stock}</p>
+                <p><strong>Estante:</strong> {producto.estante}</p> {/* Mostrar el estante */}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Modal de producto seleccionado */}
+        {isModalOpen && productoSeleccionado && (
           <div className="popup-consulta">
             <div className="popup-content">
               <span className="close" onClick={closeModal}>&times;</span>
               <h3>Información del Producto</h3>
-              <p><strong>Nombre:</strong> {productoEncontrado.nombre}</p>
-              <p><strong>Código:</strong> {productoEncontrado.codigo}</p>
-              <p><strong>Precio:</strong> Q{productoEncontrado.precio}</p>
-              <p><strong>Stock:</strong> {productoEncontrado.stock}</p>
-              {productoEncontrado.imagen && (
+              <p><strong>Nombre:</strong> {productoSeleccionado.nombre}</p>
+              <p><strong>Código:</strong> {productoSeleccionado.codigo}</p>
+              <p><strong>Precio:</strong> Q{productoSeleccionado.precio}</p>
+              <p><strong>Stock:</strong> {productoSeleccionado.stock}</p>
+              <p><strong>Estante:</strong> {productoSeleccionado.estante}</p> {/* Mostrar el estante */}
+              {productoSeleccionado.imagen && (
                 <div className="image-preview">
                   <img
-                    src={productoEncontrado.imagen}
+                    src={productoSeleccionado.imagen}
                     alt="Imagen del producto"
                     style={{ width: "200px", height: "200px", objectFit: "cover" }}
                   />

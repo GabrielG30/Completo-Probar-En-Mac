@@ -1,9 +1,9 @@
-import { FaShoppingCart, FaSearch, FaBoxes } from "react-icons/fa";
+import { FaShoppingCart, FaSearch, FaBoxes, FaFilePdf } from "react-icons/fa";
 
 function Sidebar({ setView }) {
   return (
     <nav className="sidebar">
-      <h2>Farmacia R&R</h2>
+      <h2>PosGo</h2>
       <ul>
         <li onClick={() => setView("ventas")}>
           <FaShoppingCart /> Caja
@@ -13,6 +13,9 @@ function Sidebar({ setView }) {
         </li>
         <li onClick={() => setView("inventario")}>
           <FaBoxes /> Inventario
+        </li>
+        <li onClick={() => setView("cortes")}>
+          <FaFilePdf /> Cortes
         </li>
       </ul>
     </nav>

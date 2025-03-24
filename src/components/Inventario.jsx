@@ -1,18 +1,21 @@
 import React, { useEffect, useState, useRef } from "react";
-import { FaCog, FaPlus } from "react-icons/fa";
+import { FaCog, FaPlus, FaEdit } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import "./Inventario.css";
 
 const Inventario = () => {
   const [inventario, setInventario] = useState([]);
   const [headers, setHeaders] = useState([]);
-  const [columnMapping, setColumnMapping] = useState({ nombre: "", codigo: "", precio: "", stock: "" });
+  const [columnMapping, setColumnMapping] = useState({ nombre: "", codigo: "", precio: "", stock: "", estante: "" });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [searchCode, setSearchCode] = useState("");
-  const [productToEdit, setProductToEdit] = useState(null);
-  const [newProduct, setNewProduct] = useState({ nombre: "", codigo: "", precio: "", stock: "" });
+  const [productsToEdit, setProductsToEdit] = useState([]);
+  const [newProduct, setNewProduct] = useState({ nombre: "", codigo: "", precio: "", stock: "", estante: "" });
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchResultsModalOpen, setIsSearchResultsModalOpen] = useState(false);
+  const [searchMessage, setSearchMessage] = useState(""); // Nuevo estado para el mensaje de búsqueda
 
   const searchInputRef = useRef(null);
 
@@ -41,7 +44,7 @@ const Inventario = () => {
 
   const closeAddProductModal = () => {
     setIsAddProductModalOpen(false);
-    setNewProduct({ nombre: "", codigo: "", precio: "", stock: "" });
+    setNewProduct({ nombre: "", codigo: "", precio: "", stock: "", estante: "" });
   };
 
   const handleNewProductChange = (e) => {
@@ -50,9 +53,9 @@ const Inventario = () => {
   };
 
   const saveNewProduct = async () => {
-    const { nombre, codigo, precio, stock } = newProduct;
+    const { nombre, codigo, precio, stock, estante } = newProduct;
 
-    if (!nombre || !codigo || !precio || !stock) {
+    if (!nombre || !codigo || !precio || !stock || !estante) {
       alert("Por favor, completa todos los campos.");
       return;
     }
@@ -61,7 +64,8 @@ const Inventario = () => {
       nombre,
       codigo,
       precio: parseFloat(precio).toFixed(2),
-      stock: parseInt(stock)
+      stock: parseInt(stock),
+      estante
     }];
 
     try {
@@ -99,7 +103,7 @@ const Inventario = () => {
   };
 
   const saveInventario = async () => {
-    if (!columnMapping.nombre || !columnMapping.codigo || !columnMapping.precio || !columnMapping.stock) {
+    if (!columnMapping.nombre || !columnMapping.codigo || !columnMapping.precio || !columnMapping.stock || !columnMapping.estante) {
       alert("Debes asignar todas las columnas antes de guardar");
       return;
     }
@@ -119,11 +123,15 @@ const Inventario = () => {
       const stockIndex = headers.findIndex((header) =>
         normalizeHeader(header) === normalizeHeader(columnMapping.stock)
       );
+      const estanteIndex = headers.findIndex((header) =>
+        normalizeHeader(header) === normalizeHeader(columnMapping.estante)
+      );
 
       const nombre = row[nombreIndex] || "";
       const codigo = row[codigoIndex] ? row[codigoIndex].toString().trim() : "";
       const precio = parseFloat(row[precioIndex]) || 0.0;
       const stock = parseInt(row[stockIndex]) || 0;
+      const estante = row[estanteIndex] || "";
 
       if (nombre && codigo) {
         return {
@@ -131,6 +139,7 @@ const Inventario = () => {
           codigo: codigo,
           precio: precio.toFixed(2),
           stock: stock,
+          estante: estante
         };
       }
       return null;
@@ -172,40 +181,57 @@ const Inventario = () => {
   };
 
   const handleSearch = () => {
-    const product = inventario.find(item => item.codigo === searchCode.trim());
-    if (product) {
-      setProductToEdit(product);
-    } else {
-      alert("Producto no encontrado");
+    const searchTerm = searchCode.trim().toLowerCase();
+    const products = inventario.filter(item =>
+      item.codigo.toLowerCase().includes(searchTerm) ||
+      item.nombre.toLowerCase().includes(searchTerm)
+    );
+
+    if (products.length === 0) {
+      setSearchMessage("Producto no encontrado"); // Mostrar mensaje de error
       setSearchCode(""); // Limpiar el campo de búsqueda
       if (searchInputRef.current) {
         searchInputRef.current.focus(); // Enfocar nuevamente el campo de búsqueda
       }
+
+      // Limpiar el mensaje después de 2 segundos
+      setTimeout(() => {
+        setSearchMessage("");
+      }, 2000);
+    } else {
+      setSearchResults(products);
+      setIsSearchResultsModalOpen(true); // Abrir ventana con resultados
+      setSearchMessage(""); // Limpiar el mensaje de error
+      setSearchCode(""); // Limpiar el campo de búsqueda
     }
   };
 
+  const selectProductToEdit = (product) => {
+    setProductsToEdit([product]);
+    setSearchResults([]);
+    setIsSearchResultsModalOpen(false);
+  };
+
   const closeEditModal = () => {
-    setProductToEdit(null);
+    setProductsToEdit([]);
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
   };
 
-  const handleEditProduct = async () => {
-    if (productToEdit) {
-      const updatedProduct = {
-        ...productToEdit,
-        precio: parseFloat(productToEdit.precio).toFixed(2),
-        stock: parseInt(productToEdit.stock),
-      };
+  const handleEditProduct = async (product) => {
+    const updatedProduct = {
+      ...product,
+      precio: parseFloat(product.precio).toFixed(2),
+      stock: parseInt(product.stock),
+    };
 
-      try {
-        await window.electron.updateInventario(updatedProduct);
-        cargarInventarioDesdeDB();
-        closeEditModal();
-      } catch (error) {
-        console.error("Error al editar el producto:", error);
-      }
+    try {
+      await window.electron.updateInventario(updatedProduct);
+      cargarInventarioDesdeDB();
+      closeEditModal();
+    } catch (error) {
+      console.error("Error al editar el producto:", error);
     }
   };
 
@@ -314,6 +340,15 @@ const Inventario = () => {
                 onChange={handleNewProductChange}
               />
             </div>
+            <div>
+              <label>Estante:</label>
+              <input
+                type="text"
+                name="estante"
+                value={newProduct.estante}
+                onChange={handleNewProductChange}
+              />
+            </div>
             <button onClick={saveNewProduct}>Guardar Producto</button>
           </div>
         </div>
@@ -322,7 +357,7 @@ const Inventario = () => {
       <div className="search-bar">
         <input
           type="text"
-          placeholder="Ingresa código de barras"
+          placeholder="Ingresa código de barras o nombre"
           value={searchCode}
           onChange={(e) => setSearchCode(e.target.value)}
           onKeyPress={handleSearchKeyPress}
@@ -332,45 +367,66 @@ const Inventario = () => {
         <button onClick={handleSearch}>Buscar</button>
       </div>
 
-      {productToEdit && (
+      {isSearchResultsModalOpen && (
+        <div className="modal">
+          <div className="modal-content">
+            <span className="close" onClick={() => setIsSearchResultsModalOpen(false)}>&times;</span>
+            <h3>Resultados de la búsqueda:</h3>
+            <ul className="search-results-list">
+              {searchResults.map((product, index) => (
+                <li key={index} className="search-result-item">
+                  <span>{product.nombre} - {product.codigo}</span>
+                  <FaEdit className="edit-icon" onClick={() => selectProductToEdit(product)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {productsToEdit.length > 0 && (
         <div className="modal">
           <div className="modal-content">
             <span className="close" onClick={closeEditModal}>&times;</span>
             <h3>Editar Producto</h3>
-            <div>
-              <label>Nombre:</label>
-              <input
-                type="text"
-                value={productToEdit.nombre}
-                onChange={(e) => setProductToEdit({ ...productToEdit, nombre: e.target.value })}
-              />
-            </div>
-            <div>
-              <label>Código:</label>
-              <input
-                type="text"
-                value={productToEdit.codigo}
-                onChange={(e) => setProductToEdit({ ...productToEdit, codigo: e.target.value })}
-              />
-            </div>
-            <div>
-              <label>Precio:</label>
-              <input
-                type="number"
-                value={productToEdit.precio}
-                onChange={(e) => setProductToEdit({ ...productToEdit, precio: e.target.value })}
-              />
-            </div>
-            <div>
-              <label>Stock:</label>
-              <input
-                type="number"
-                value={productToEdit.stock}
-                onChange={(e) => setProductToEdit({ ...productToEdit, stock: e.target.value })}
-              />
-            </div>
-            <button onClick={handleEditProduct}>Guardar Cambios</button>
-            <button onClick={() => deleteProduct(productToEdit.codigo)} style={{ marginLeft: '10px', backgroundColor: 'red', color: 'white' }}>Eliminar Producto</button>
+            {productsToEdit.map((product, index) => (
+              <div key={index}>
+                <div>
+                  <label>Nombre:</label>
+                  <input
+                    type="text"
+                    value={product.nombre}
+                    onChange={(e) => setProductsToEdit(productsToEdit.map((p, i) => i === index ? { ...p, nombre: e.target.value } : p))}
+                  />
+                </div>
+                <div>
+                  <label>Código:</label>
+                  <input
+                    type="text"
+                    value={product.codigo}
+                    onChange={(e) => setProductsToEdit(productsToEdit.map((p, i) => i === index ? { ...p, codigo: e.target.value } : p))}
+                  />
+                </div>
+                <div>
+                  <label>Precio:</label>
+                  <input
+                    type="number"
+                    value={product.precio}
+                    onChange={(e) => setProductsToEdit(productsToEdit.map((p, i) => i === index ? { ...p, precio: e.target.value } : p))}
+                  />
+                </div>
+                <div>
+                  <label>Stock:</label>
+                  <input
+                    type="number"
+                    value={product.stock}
+                    onChange={(e) => setProductsToEdit(productsToEdit.map((p, i) => i === index ? { ...p, stock: e.target.value } : p))}
+                  />
+                </div>
+                <button onClick={() => handleEditProduct(product)}>Guardar Cambios</button>
+                <button onClick={() => deleteProduct(product.codigo)} style={{ marginLeft: '10px', backgroundColor: 'red', color: 'white' }}>Eliminar Producto</button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -382,6 +438,7 @@ const Inventario = () => {
             <th>Código</th>
             <th>Precio</th>
             <th>Stock</th>
+            <th>Estante</th>
           </tr>
         </thead>
         <tbody>
@@ -391,6 +448,7 @@ const Inventario = () => {
               <td>{producto.codigo}</td>
               <td>{producto.precio}</td>
               <td>{producto.stock}</td>
+              <td>{producto.estante}</td>
             </tr>
           ))}
         </tbody>
