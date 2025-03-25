@@ -354,23 +354,38 @@ ipcMain.handle('realizar-venta', async (event, venta, printerName) => {
       throw new Error('La venta no es válida');
     }
 
+    const fechaHora = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+
     db.serialize(() => {
       db.run('BEGIN TRANSACTION');
 
-      const fechaHora = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
       const ventaStmt = db.prepare(`
         INSERT INTO ventas (fecha_hora, codigo_producto, cantidad, monto)
         VALUES (?, ?, ?, ?)
       `);
 
+      const stockStmt = db.prepare(`
+        UPDATE inventario SET stock = stock - ? WHERE codigo = ? AND stock >= ?
+      `);
+
       venta.productos.forEach((producto) => {
+        // Registrar la venta
         ventaStmt.run(fechaHora, producto.codigo, producto.cantidad, producto.precio * producto.cantidad, (err) => {
           if (err) {
             console.error(`Error al insertar venta del producto ${producto.codigo}:`, err.message);
           }
         });
+
+        // Descontar el stock
+        stockStmt.run(producto.cantidad, producto.codigo, producto.cantidad, (err) => {
+          if (err) {
+            console.error(`Error al descontar stock del producto ${producto.codigo}:`, err.message);
+          }
+        });
       });
+
       ventaStmt.finalize();
+      stockStmt.finalize();
 
       db.run('COMMIT', (err) => {
         if (err) {
@@ -673,10 +688,13 @@ ipcMain.handle('generarCorte', async (event, tipoCorte, nombreNegocio) => {
 
     // Obtener las ventas según el tipo de corte
     if (tipoCorte === 'diario') {
+      const inicioDia = `${fechaActual} 00:00:00`;
+      const finDia = `${fechaActual} 22:00:00`; // Hasta las 10 PM
+
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATE(ventas.fecha_hora) = ?',
-          [fechaActual],
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE fecha_hora BETWEEN ? AND ?',
+          [inicioDia, finDia],
           (err, rows) => {
             if (err) {
               console.error('Error al obtener las ventas del día:', err.message);
@@ -803,10 +821,13 @@ ipcMain.handle('getVentasPorPeriodo', async (event, periodo) => {
 
     let ventas;
     if (periodo === 'diario') {
+      const inicioDia = `${fechaActual} 00:00:00`;
+      const finDia = `${fechaActual} 23:59:59`; // Hasta las 11:59 PM
+
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT * FROM ventas WHERE DATE(fecha_hora) = ?',
-          [fechaActual],
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE fecha_hora BETWEEN ? AND ?',
+          [inicioDia, finDia],
           (err, rows) => {
             if (err) {
               console.error('Error al obtener las ventas del día:', err.message);
@@ -824,7 +845,7 @@ ipcMain.handle('getVentasPorPeriodo', async (event, periodo) => {
 
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT * FROM ventas WHERE DATE(fecha_hora) BETWEEN ? AND ?',
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATE(fecha_hora) BETWEEN ? AND ?',
           [fechaInicio, fechaActual],
           (err, rows) => {
             if (err) {
@@ -843,7 +864,7 @@ ipcMain.handle('getVentasPorPeriodo', async (event, periodo) => {
 
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT * FROM ventas WHERE DATE(fecha_hora) BETWEEN ? AND ?',
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATE(fecha_hora) BETWEEN ? AND ?',
           [fechaInicio, fechaActual],
           (err, rows) => {
             if (err) {
@@ -902,3 +923,4 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
