@@ -568,54 +568,6 @@ const generarPDFCorte = async (ventas, tipo) => {
   }
 };
 
-// Obtener ventas por período (día, semana, mes)
-ipcMain.handle('get-ventas-por-periodo', async (event, tipo) => {
-  try {
-    let query = `
-      SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto
-      FROM ventas
-      INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo
-    `;
-
-    let params = [];
-    const hoy = new Date();
-
-    if (tipo === 'diario') {
-      const fechaHoy = hoy.toISOString().split('T')[0];
-      query += ` WHERE date(ventas.fecha_hora) = ?`;
-      params.push(fechaHoy);
-
-    } else if (tipo === 'semanal') {
-      let semanaAtras = new Date();
-      semanaAtras.setDate(hoy.getDate() - 7);
-      query += ` WHERE date(ventas.fecha_hora) BETWEEN ? AND ?`;
-      params.push(semanaAtras.toISOString().split('T')[0], hoy.toISOString().split('T')[0]);
-
-    } else if (tipo === 'mensual') {
-      let mesAtras = new Date();
-      mesAtras.setMonth(hoy.getMonth() - 1);
-      query += ` WHERE date(ventas.fecha_hora) BETWEEN ? AND ?`;
-      params.push(mesAtras.toISOString().split('T')[0], hoy.toISOString().split('T')[0]);
-    }
-
-    query += ` ORDER BY ventas.fecha_hora DESC`;
-
-    return new Promise((resolve, reject) => {
-      db.all(query, params, (err, rows) => {
-        if (err) {
-          console.error('Error obteniendo ventas:', err.message);
-          reject([]);
-        } else {
-          resolve(rows);
-        }
-      });
-    });
-  } catch (error) {
-    console.error('Error en get-ventas-por-periodo:', error.message);
-    return [];
-  }
-});
-
 // Generar un corte (diario, semanal, mensual)
 ipcMain.handle('generar-corte', async (event, tipo) => {
   try {
@@ -626,8 +578,8 @@ ipcMain.handle('generar-corte', async (event, tipo) => {
         SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto
         FROM ventas
         INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo
-        WHERE ${tipo === 'diario' ? "DATE(ventas.fecha_hora) = DATE('now')" : 
-               tipo === 'semanal' ? "DATE(ventas.fecha_hora) >= DATE('now', '-7 days')" : 
+        WHERE ${tipo === 'diario' ? "DATE(ventas.fecha_hora, 'localtime') = DATE('now', 'localtime')" : 
+          tipo === 'semanal' ? "DATE(ventas.fecha_hora) BETWEEN DATE('now', '-strftime('%w', 'now') days') AND DATE('now')" : 
                "strftime('%Y-%m', ventas.fecha_hora) = strftime('%Y-%m', 'now')"}
         `,
         (err, rows) => {
@@ -650,6 +602,7 @@ ipcMain.handle('generar-corte', async (event, tipo) => {
     return { success: false, error: error.message };
   }
 });
+
 
 // Función para imprimir el PDF
 const imprimirPDF = async (pdfPath, printerName) => {
@@ -684,16 +637,16 @@ ipcMain.handle('generarCorte', async (event, tipoCorte, nombreNegocio) => {
   try {
     const db = getDatabaseConnection();
     let ventas = [];
-    const fechaActual = new Date().toISOString().split('T')[0];
-
+    // const fechaActual = new Date().toISOString().split('T')[0];
+    const fechaActual = format(new Date(), 'yyyy-MM-dd');
     // Obtener las ventas según el tipo de corte
     if (tipoCorte === 'diario') {
       const inicioDia = `${fechaActual} 00:00:00`;
-      const finDia = `${fechaActual} 22:00:00`; // Hasta las 10 PM
+      const finDia = `${fechaActual} 23:59:59`; // Hasta las 10 PM regresar a las 22:00 horas, por pruebas se pondrá a las 23:59 horas
 
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE fecha_hora BETWEEN ? AND ?',
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATETIME(ventas.fecha_hora) BETWEEN ? AND ?',
           [inicioDia, finDia],
           (err, rows) => {
             if (err) {
@@ -817,16 +770,16 @@ ipcMain.handle('generarCorte', async (event, tipoCorte, nombreNegocio) => {
 ipcMain.handle('getVentasPorPeriodo', async (event, periodo) => {
   try {
     const db = getDatabaseConnection(); // Obtener la conexión a la base de datos
-    const fechaActual = new Date().toISOString().split('T')[0]; // Fecha en formato YYYY-MM-DD
+    const fechaActual = format(new Date(), 'yyyy-MM-dd'); // Fecha actual en formato YYYY-MM-DD
 
     let ventas;
     if (periodo === 'diario') {
       const inicioDia = `${fechaActual} 00:00:00`;
-      const finDia = `${fechaActual} 23:59:59`; // Hasta las 11:59 PM
+      const finDia = `${fechaActual} 23:59:59`;
 
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE fecha_hora BETWEEN ? AND ?',
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATETIME(fecha_hora) BETWEEN ? AND ?',
           [inicioDia, finDia],
           (err, rows) => {
             if (err) {
@@ -839,14 +792,19 @@ ipcMain.handle('getVentasPorPeriodo', async (event, periodo) => {
         );
       });
     } else if (periodo === 'semanal') {
-      const fechaInicioSemana = new Date();
-      fechaInicioSemana.setDate(fechaInicioSemana.getDate() - 7);
-      const fechaInicio = fechaInicioSemana.toISOString().split('T')[0];
+      // Calcular el domingo más reciente
+      const hoy = new Date();
+      const domingo = new Date(hoy);
+      domingo.setDate(hoy.getDate() - hoy.getDay()); // Retroceder al domingo más cercano
+      domingo.setHours(0, 0, 0, 0); // Inicio del domingo
+
+      const inicioSemana = format(domingo, 'yyyy-MM-dd 00:00:00'); // Domingo más reciente
+      const finSemana = `${fechaActual} 23:59:59`; // Día actual hasta las 11:59 PM
 
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATE(fecha_hora) BETWEEN ? AND ?',
-          [fechaInicio, fechaActual],
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATETIME(fecha_hora) BETWEEN ? AND ?',
+          [inicioSemana, finSemana],
           (err, rows) => {
             if (err) {
               console.error('Error al obtener las ventas de la semana:', err.message);
@@ -859,13 +817,14 @@ ipcMain.handle('getVentasPorPeriodo', async (event, periodo) => {
       });
     } else if (periodo === 'mensual') {
       const fechaInicioMes = new Date();
-      fechaInicioMes.setMonth(fechaInicioMes.getMonth() - 1);
-      const fechaInicio = fechaInicioMes.toISOString().split('T')[0];
+      fechaInicioMes.setDate(1); // Primer día del mes
+      const inicioMes = format(fechaInicioMes, 'yyyy-MM-dd 00:00:00');
+      const finMes = `${fechaActual} 23:59:59`;
 
       ventas = await new Promise((resolve, reject) => {
         db.all(
-          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATE(fecha_hora) BETWEEN ? AND ?',
-          [fechaInicio, fechaActual],
+          'SELECT ventas.fecha_hora, inventario.nombre, ventas.cantidad, ventas.monto FROM ventas INNER JOIN inventario ON ventas.codigo_producto = inventario.codigo WHERE DATETIME(fecha_hora) BETWEEN ? AND ?',
+          [inicioMes, finMes],
           (err, rows) => {
             if (err) {
               console.error('Error al obtener las ventas del mes:', err.message);
